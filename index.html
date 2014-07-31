@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>Force Directed DFE Linkage Graph</title>
+		<script type="text/javascript" src="d3/d3.v3.js"></script>
+		
+		<style type="text/css">
+			.axis path,
+		.axis line {
+			fill: none;
+			stroke: black;
+			shape-rendering: crispEdges;
+		}
+		.axis text {
+			font-family: sans-serif;
+			font-size: 11px;
+		}
+		</style>
+		<form name="mainForm" style="width:49%; float:left">
+			<p> Enter EINPN of DFE:
+				<input type="text" size="20" name="YourDFE"></input>
+				Select Year:
+				<select name="yearSelect">
+				
+				<option value="2010">2010</option>
+				</select>
+				
+			</p>
+			<p>
+				<input type="button" onclick="initialize()" name="B0" value="Initialize Analysis - Investor"></input>
+				<input type="button" onclick="initialize_reverse()" name="B00" value= "Initialize Analysis - Investee"></input>
+				<input type="button" onclick="runFirst()" name="B1" value="Step Through"></input>
+				Show Administrative Expenses?
+				<select name="adminOnOff">
+				<option value="On">Yes</option>
+				<option value="Off">No</option>
+				</select>
+			</p>
+		</form>
+		<div id="infoDiv" style="width: 49%; float:right; height: 90px; background-color: black;">
+		</div>
+		
+		
+	</head>
+	<body>
+	<div id="container" style="width:90%;">
+		<div id="chart" style="float:left; background-color: #FFD700;;height: 500px; width: 49%; display:inline-block;"></div>
+		<div id="bar" style="float:right; background-color: #FFD700;; width: 49%;"></div>
+	</div>
+		<script type="text/javascript">
+		//Set number of iterations to run through the DFE levels
+		var numIterations = 0;
+		var simType=0;
+		
+		//Function that runs when clicking the "INITIALIZE" button
+		//Sets number of iterations at 1, and runs the entire simulation
+		function initialize() {
+		numIterations=1;
+		simType=1;
+		runSimulation();
+		}
+		
+		function initialize_reverse() {
+		numIterations=1;
+		simType=2;
+		runSimulation2();
+		}
+		
+		//When the "STEP THROUGH" button is used, this function is called to increase the number of iterations
+		//and runs the entire simulaion
+		function runFirst() {
+		numIterations++;
+		if (simType==1) {runSimulation();};
+		if (simType==2) {runSimulation2();};
+		}
+		
+		
+		//Function container for the entire simulation
+		function runSimulation() {
+		// Initial conditions for the directed graph size (the SVG)
+		var width = 500,
+          height = 500;
+		 
+		//Set radius of the focal node size
+		var centerNodeSize = 15;
+		
+		//Set radius of other nodes
+		var nodeSize = 5;
+		
+		//Set up scale for colors (not used presently
+        var colorScale = d3.scale.category20();
+		
+		//Sets up array of focal nodes (i.e. DFEs to focus on
+		//On first iteration contains only the user-selected DFE
+		//On subsequent iterations contains the nodes that that DFE invests in and so-on
+		var focalNodeId = [document.mainForm.YourDFE.value];
+		
+		//This variable is set on the user-input DFE
+		var targetDFE=focalNodeId[0];
+		
+		//This variable is set based on the drop-down box selecting Form 5500 end year
+		var yearSelection = document.mainForm.yearSelect.value;
+		
+		//This variable is set based user selection of Yes/No for analyze admin
+		var adminSelection = document.mainForm.adminOnOff.value;
+		
+		var formatAsLargeNumber = d3.format(",14d");
+		
+		d3.selectAll("svg").remove();
+        var svgCanvas = d3.select("#chart").append("svg:svg")
+          .attr("width", width)
+          .attr("height", height)
+		  .attr("position", "absolute");
+		  
+		var svgCanvasBar = d3.select("#bar").append("svg").attr("height", 500).attr("width", 700).attr("x",0).attr("y",0);
+		
+		var infoCanvas = d3.select("#infoDiv").append("svg:svg").attr("position","absolute").attr("height", 90).attr("width", 500).attr("x",0).attr("y",0);
+		
+		
+		
+		// Set up scaling function for bar graph
+		var colorCircleScale = d3.scale.linear().domain([0, numIterations]).range([0, 255]);
+		var transparencyScale = d3.scale.linear().domain([0, numIterations]).range([1, 0.1]);
+		
+		
+		d3.csv("nodes2012.csv", function(csvNodes) {
+			d3.csv("links2012.csv", function(csvLinks) {
+				d3.csv("finallinks2012.csv", function(csvFinalLinks) {
+			
+			var levelCounter=[1];
+			for(z=0; z<numIterations; z++) {
+			
+			var links=[];
+			for(i=0; i<focalNodeId.length; i++) {
+			csvLinks.forEach(function(d){
+					if(d.sourceId==focalNodeId[i]) {links.push(d)};
+				
+			});
+			};
+			
+			
+			
+			
+						
+			//Filters the array of nodes to a unique list
+			var filtLinks = links.filter(function(element, pos) {
+				return links.indexOf(element)==pos;
+			});
+			
+			
+			//Now we have filtered FIRST ORDER links, but nothing beyond that
+			
+			//creates an array of nodes from the filtered links created above (with duplicates)
+			var nodes=[];
+			filtLinks.forEach(function(d){
+			nodes.push(d.sourceId);
+			nodes.push(d.targetId);
+			});
+		
+			var oldFocalNodeId=focalNodeId;
+			
+			//Filters the array of nodes to a unique list
+			focalNodeId = nodes.filter(function(element, pos) {
+				return nodes.indexOf(element)==pos;
+			});
+			
+			if (oldFocalNodeId.length==focalNodeId.length) {alert("You have stepped all the way through to terminal DFEs");};
+			
+			levelCounter[z+1]=focalNodeId.length;
+			
+			
+			
+			
+	};		
+	
+	var finalLinks=[];
+			csvFinalLinks.forEach(function(d) {
+				if (d.sourceIdFinal==targetDFE) {finalLinks.push(d);};
+			});
+	
+			
+	var filtNodes=[];
+			for(i=0; i<focalNodeId.length; i++) {
+			csvNodes.forEach(function(d){
+					if(d.sourceId==focalNodeId[i]) {filtNodes.push(d)};
+				
+			});
+			};
+			
+			for(i=0; i<finalLinks.length; i++) {
+			filtNodes.forEach(function(d){
+					if (finalLinks[i].targetIdFinal==d.sourceId) {d.prctOwned=finalLinks[i].prctOwned;};
+					
+					
+			});
+			};
+		
+
+			
+	
+	
+		
+			nodeSet=filtNodes;
+			linkSet=filtLinks;
+			//set up finalLinkSet
+			
+			
+			for(j=0; j<nodeSet.length; j++) {
+				for(i=0; i<numIterations+1; i++) {
+					if (j==0) {nodeSet[j].level=0;};
+					if (j<levelCounter[i] && j>=levelCounter[i-1] && i>0) {nodeSet[j].level=i;};
+					
+				};
+			};
+			
+			
+			
+			var node_hash=[];
+			
+			nodeSet.forEach(function(d,i) {
+				node_hash[d.sourceId]=d;
+				
+			});
+			
+			
+			
+			
+			
+			linkSet.forEach(function(d,i) {
+				d.source=node_hash[d.sourceId];
+				d.target=node_hash[d.targetId];
+				if (d.sourceId == targetDFE)
+					{ d.direction = "OUT"; }
+				else
+					{ d.direction = "IN"; }
+			});
+			
+			var n=nodeSet.length;
+			
+			nodeSet.forEach(function(d,i) {d.x=0; d.y=50*i;});
+			nodeSet[0].weight=1000;
+			nodeSet[0].x=width/2;
+			nodeSet[0].y=height/2;
+			nodeSet[0].fixed=true;
+			
+			var k= Math.sqrt(nodeSet.length / (width*height));
+			
+			var keyNode=nodeSet[0];
+			
+			
+		var colorCircleScale = d3.scale.linear().domain([0, numIterations]).range([0, 255]);
+		var colorCircleScale2 = d3.scale.linear().domain([0, nodeSet.length]).range([0,255]);
+		var transparencyScale = d3.scale.linear().domain([0, numIterations]).range([1, 0.1]);
+				
+			var force = d3.layout.force()
+					 .charge(-20/k)
+					 .gravity(50*k)
+					 .nodes(nodeSet)
+					 .links(linkSet)
+					 .size([width, height])
+					 .linkDistance( function(d) { if (width < height) { return width*1/(10*numIterations^2); } else { return height*1/(10*numIterations^2) } } )
+					 .on("tick", tick)
+					 .start();
+		
+		var link = svgCanvas.selectAll(".gLink")
+          .data(force.links())
+          .enter().append("g")
+		  .attr("class", "gLink")
+          .append("line")
+          .attr("fill", function(d) {if (d.direction=="OUT") {return "black";} else {return "black";}})
+          .style("stroke", function(d) {if (d.direction=="OUT") {return "black";} else {return "black";}})
+          .attr("x1", function(d) { return d.source.x; })
+          .attr("y1", function(d) { return d.source.y; })
+          .attr("x2", function(d) { return d.target.x; })
+          .attr("y2", function(d) { return d.target.y; });
+		
+		
+		
+
+      // Create Nodes
+      var node = svgCanvas.selectAll(".node")
+          .data(force.nodes())
+          .enter().append("g")
+          .attr("class", "node");
+	  var currentSource="blank";
+      // Append circles to Nodes
+      node.append("circle")
+          .attr("x", function(d) { return d.x; })
+          .attr("y", function(d) { return d.y; })
+		  .attr("id", function(d) {return d.sourceId;})
+          .attr("r", function(d) { if (d.sourceId==targetDFE) { return centerNodeSize; } else { return nodeSize; } } ) // Node radius
+          .style("fill", function(d, i) { if(d.sourceId==currentSource) {return "red";}
+										  else	{return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}
+										}) // Make the nodes hollow looking
+          .style("stroke-width", 5) // Give the node strokes some thickness
+          .style("stroke", function(d, i) { if(d.sourceId==currentSource) {return "red";}
+										  else	{return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}} ) // Node stroke colors
+		  
+		  .on("click",function(dat,i){
+					var curSource=dat.sourceId;
+					svgCanvasBar.selectAll("rect")
+								.attr("fill", function(d) {if (curSource==d.id) {return "red";} else {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}});
+					svgCanvas.selectAll("circle").style("fill", function(d) {if (d.sourceId==curSource) {return "red"} 
+								                                                         else {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}})
+												 .style("stroke", function(d) {if (d.sourceId==curSource) {return "red"} 
+								                                                         else {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}});
+
+							 
+		  })
+		  .append("svg:title")
+		  .text(function(d) {return "EINPN: " + d.sourceId + "//  Plan Name: " + d.plan_name + "//  Sponsor Name: " + d.sponsor_dfe_name +
+		                            "//  Assets from this DFE = " + formatAsLargeNumber(Math.round(d.prctOwned*d.ASSETS_LESS)) +
+									"//  At a level " + d.level + " of investment";});
+		  
+		  
+	  node.append("text")
+		  .text(function(d) {if (d.sourceId==targetDFE) {return d.sourceId;}})
+		  .attr("x", function(d) { if (d.sourceId==targetDFE) { return 40; } else {return 40;} } )
+		  .attr("y", function(d) { if (d.sourceId==targetDFE) { return 0; } else {return -50;} } )
+		  .attr("font-family", "Arial, Helvetica, sans-serif")
+          .style("font", "normal 12px Arial")
+          .attr("fill", "black");
+		  
+		
+		function tick() {
+        link
+          .attr("x1", function(d) { return d.source.x; })
+          .attr("y1", function(d) { return d.source.y; })
+          .attr("x2", function(d) { return d.target.x; })
+          .attr("y2", function(d) { return d.target.y; });
+      
+        node
+          .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+
+        
+		}
+		
+		var groups=["CASH",
+							"GOVT_SEC",
+							"CORP_DEBT",
+							"STOCK",
+							"REAL_ESTATE",
+							"JOINT_VENTURE",
+							"MUTUAL_FUNDS",
+							"INSURANCE_CO",
+							"OTHER",
+							"TOT_ADMIN_EXPENSES_AMT",
+							"indirect_comp"];
+							
+		
+		var testData=nodeSet.map(function(d) {
+							return groups.map(function(cause) {
+							return {type: cause, y: +d[cause]*d.prctOwned, x: d.index,  
+							        level: d.level, id: d.sourceId, plan_name: d.plan_name,
+									sponsor_dfe_name: d.sponsor_dfe_name,
+									assets: d.prctOwned*d.TOTAL_ASSETS, index: d.index};
+							});
+							});
+		
+		var causes=d3.layout.stack()(testData);
+		
+		
+		var maxBar = d3.max(causes, function(array) {
+							return d3.max(array, function(d) {return d.y+d.y0;});
+							});
+		
+		var barScale = d3.scale.linear().domain([maxBar,0]).range([260,0]);
+		var barScaleReverse = d3.scale.linear().domain([260,0]).range([maxBar,0])
+		var yAxisScale = d3.scale.linear().domain([0,maxBar]).range([260,0]);
+		
+		var yAxis = d3.svg.axis()
+						  .scale(yAxisScale)
+						  .orient("left")
+						  .ticks(10);
+			
+		
+		var cause=svgCanvasBar.selectAll("g.type")
+							  .data(causes)
+							  .enter()
+							  .append("svg:g")
+							  .attr("class", "type");
+		
+		var rect=cause.selectAll("rect")
+					  .data(Object)
+					  .enter().append("rect")
+					  .attr("x", function(d, i) {if(d.type=="CASH") {return 100;}
+					                            if(d.type=="GOVT_SEC") {return 140;}
+												if(d.type=="CORP_DEBT") {return 180;}
+												if(d.type=="STOCK") {return 220;}
+												if(d.type=="REAL_ESTATE") {return 260;}
+												if(d.type=="JOINT_VENTURE") {return 300;}
+												if(d.type=="MUTUAL_FUNDS") {return 340;}
+												if(d.type=="INSURANCE_CO") {return 380;}
+												if(d.type=="OTHER") {return 420;}
+												if(d.type=="TOT_ADMIN_EXPENSES_AMT") {return 460;}
+												if(d.type=="indirect_comp") {return 500;}
+												})
+					  .attr("y", function(d,i) {return 330-barScale(d.y0)-barScale(d.y);})
+					  .attr("width", 20)
+					  .attr("height", function(d) {return barScale(d.y);})
+					  .attr("fill", function(d) {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";})
+					  
+					  .on("click",function(dat,i){
+								var currentSource=dat.id;
+								svgCanvas.selectAll("circle").style("fill", function(d) {if (d.sourceId==currentSource) {return "red"} 
+								                                                         else {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}})
+															 .style("stroke", function(d) {if (d.sourceId==currentSource) {return "red"} 
+								                                                         else {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}});
+								svgCanvasBar.selectAll("rect").attr("fill", function(d) {if (d.id==currentSource) {return "red"}
+								                                                         else {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}});
+							
+						})
+						.append("svg:title")
+						.text(function(d) {return "EINPN: " + d.id + "//  Plan Name: " + d.plan_name + "//  Sponsor Name: " + d.sponsor_dfe_name +
+		                            "//  " + d.type + " Assets from this DFE = " + formatAsLargeNumber(Math.round(d.y)) +
+									"//  At a level " + d.level + " of investment";});
+					  
+		var barText=svgCanvasBar.selectAll("text")
+								.data(groups)
+								.enter()
+								.append("text")
+								.text(function(d) {return d;})
+								.attr("x", function(d,i) {return 100+40*i;})
+								.attr("y", 350)
+								.attr("font-family", "Arial, Helvetica, sans-serif")
+								.style("font", "bold 12px Arial")
+								.attr("fill", "black")
+								.attr("transform", function(d,i) {return "rotate(90,"+ (105+40*i) + "," + 350 + ")";});
+								
+		svgCanvasBar.append("g")
+					.attr("class", "axis")
+					.attr("transform", "translate(99,70)")
+					.call(yAxis);
+		
+
+		
+		
+		
+		
+		
+		
+		
+		//Add info on focal DFE to upper right corner div			  
+		var einpn = nodeSet[0].sourceId;
+		var plan_name = nodeSet[0].plan_name;
+		var sponsor_dfe_name = nodeSet[0].sponsor_dfe_name;
+		var total_assets = Math.round(nodeSet[0].TOTAL_ASSETS*nodeSet[0].prctOwned);
+		var infoEinpn = infoCanvas.append("text")
+								.text("EINPN: " + einpn)
+								.attr("x", 10)
+								.attr("y", 14)
+								.attr("font-family", "Arial, Helvetica, sans-serif")
+								.style("font", "bold 14px Arial")
+								.attr("fill", "white");
+		var infoPlan_name = infoCanvas.append("text")
+								.text("Plan Name: " + plan_name)
+								.attr("x", 10)
+								.attr("y", 30)
+								.attr("font-family", "Arial, Helvetica, sans-serif")
+								.style("font", "bold 14px Arial")
+								.attr("fill", "white");
+		var infoSponsor_dfe_name = infoCanvas.append("text")
+								.text("Sponsor Name: " + sponsor_dfe_name)
+								.attr("x", 10)
+								.attr("y", 46)
+								.attr("font-family", "Arial, Helvetica, sans-serif")
+								.style("font", "bold 14px Arial")
+								.attr("fill", "white");
+		var infoTotal_assets = infoCanvas.append("text")
+								.text("Total Assets: " + formatAsLargeNumber(total_assets))
+								.attr("x", 10)
+								.attr("y", 62)
+								.attr("font-family", "Arial, Helvetica, sans-serif")
+								.style("font", "bold 14px Arial")
+								.attr("fill", "white");			 
+		
+								 
+		
+		
+		
+		
+			})
+		})
+	})
+	
+	
+		
+		
+	}
+	
+		//Function container for the entire simulation
+		function runSimulation2() {
+		// Initial conditions for the directed graph size (the SVG)
+		var width = 500,
+          height = 500;
+		 
+		//Set radius of the focal node size
+		var centerNodeSize = 15;
+		
+		//Set radius of other nodes
+		var nodeSize = 5;
+		
+		//Set up scale for colors (not used presently
+        var colorScale = d3.scale.category20();
+		
+		//Sets up array of focal nodes (i.e. DFEs to focus on
+		//On first iteration contains only the user-selected DFE
+		//On subsequent iterations contains the nodes that that DFE invests in and so-on
+		var focalNodeId = [document.mainForm.YourDFE.value];
+		
+		//This variable is set on the user-input DFE
+		var targetDFE=focalNodeId[0];
+		
+		//This variable is set based on the drop-down box selecting Form 5500 end year
+		var yearSelection = document.mainForm.yearSelect.value;
+		
+		var formatAsLargeNumber = d3.format(",14d");
+		
+		d3.selectAll("svg").remove();
+        var svgCanvas = d3.select("#chart").append("svg:svg")
+          .attr("width", width)
+          .attr("height", height)
+		  .attr("position", "absolute");
+		  
+		var svgCanvasBar = d3.select("#bar").append("svg").attr("height", 500).attr("width", 700).attr("x",0).attr("y",0);
+		
+		var infoCanvas = d3.select("#infoDiv").append("svg:svg").attr("position","absolute").attr("height", 90).attr("width", 500).attr("x",0).attr("y",0);
+		
+		
+		
+		// Set up scaling function for bar graph
+		var colorCircleScale = d3.scale.linear().domain([0, numIterations]).range([0, 255]);
+		var transparencyScale = d3.scale.linear().domain([0, numIterations]).range([1, 0.1]);
+		
+		
+		d3.csv("nodes2012.csv", function(csvNodes) {
+			d3.csv("links2012.csv", function(csvLinks) {
+				d3.csv("finallinks2012.csv", function(csvFinalLinks) {
+			
+			var levelCounter=[1];
+			for(z=0; z<numIterations; z++) {
+			
+			var links=[];
+			for(i=0; i<focalNodeId.length; i++) {
+			csvLinks.forEach(function(d){
+					if(d.targetId==focalNodeId[i]) {links.push(d)};
+				
+			});
+			};
+			
+			
+			
+						
+			//Filters the array of nodes to a unique list
+			var filtLinks = links.filter(function(element, pos) {
+				return links.indexOf(element)==pos;
+			});
+			
+			//Now we have filtered FIRST ORDER links, but nothing beyond that
+			
+			//creates an array of nodes from the filtered links created above (with duplicates)
+			var nodes=[];
+			filtLinks.forEach(function(d){
+			nodes.push(d.sourceId);
+			nodes.push(d.targetId);
+			});
+		
+			var oldFocalNodeId=focalNodeId;
+			
+			//Filters the array of nodes to a unique list
+			focalNodeId = nodes.filter(function(element, pos) {
+				return nodes.indexOf(element)==pos;
+			});
+			console.log(focalNodeId);
+			
+			
+			if (oldFocalNodeId.length==focalNodeId.length) {alert("You have stepped all the way through to terminal DFEs");};
+			
+			levelCounter[z+1]=focalNodeId.length;
+			
+			
+			
+			
+	};		
+	
+	var finalLinks=[];
+			csvFinalLinks.forEach(function(d) {
+				if (d.targetIdFinal==targetDFE) {finalLinks.push(d);};
+			});
+			
+			
+	var filtNodes=[];
+			for(i=0; i<focalNodeId.length; i++) {
+			csvNodes.forEach(function(d){
+					if(d.sourceId==focalNodeId[i]) {filtNodes.push(d)};
+				
+			});
+			};
+			
+			for(i=0; i<finalLinks.length; i++) {
+			filtNodes.forEach(function(d){
+					if (finalLinks[i].sourceIdFinal==d.sourceId) {d.prctOwned=finalLinks[i].prctOwned;};
+					
+					
+			});
+			};
+			
+
+			
+	
+	
+		
+			nodeSet=filtNodes;
+			linkSet=filtLinks;
+			//set up finalLinkSet
+			
+			for(j=0; j<nodeSet.length; j++) {
+				for(i=0; i<numIterations+1; i++) {
+					if (j==0) {nodeSet[j].level=0;};
+					if (j<levelCounter[i] && j>=levelCounter[i-1] && i>0) {nodeSet[j].level=i;};
+					
+				};
+			};
+			
+			
+			
+			var node_hash=[];
+			
+			nodeSet.forEach(function(d,i) {
+				node_hash[d.sourceId]=d;
+				
+			});
+			
+			console.log(nodeSet);
+			
+			
+			
+			linkSet.forEach(function(d,i) {
+				d.target=node_hash[d.sourceId];
+				d.source=node_hash[d.targetId];
+				if (d.targetId == targetDFE)
+					{ d.direction = "OUT"; }
+				else
+					{ d.direction = "IN"; }
+			});
+			
+			var n=nodeSet.length;
+			
+			nodeSet.forEach(function(d,i) {d.x=0; d.y=50*i;});
+			nodeSet.forEach(function(d,i) {
+			if(d.sourceId==targetDFE) {d.weight=1000;
+			d.x=width/2;
+			d.y=height/2;
+			d.fixed=true;}
+			});
+			var k= Math.sqrt(nodeSet.length / (width*height));
+			
+			var keyNode=nodeSet[0];
+			
+			
+		var colorCircleScale = d3.scale.linear().domain([0, numIterations]).range([0, 255]);                     
+		var colorCircleScale2 = d3.scale.linear().domain([0, nodeSet.length]).range([0,255]);
+		var transparencyScale = d3.scale.linear().domain([0, numIterations]).range([1, 0.1]);
+				
+			var force = d3.layout.force()
+					 .charge(-20/k)
+					 .gravity(50*k)
+					 .nodes(nodeSet)
+					 .links(linkSet)
+					 .size([width, height])
+					 .linkDistance( function(d) { if (width < height) { return width*1/(10*numIterations^2); } else { return height*1/(10*numIterations^2) } } )
+					 .on("tick", tick)
+					 .start();
+		
+		var link = svgCanvas.selectAll(".gLink")
+          .data(force.links())
+          .enter().append("g")
+		  .attr("class", "gLink")
+          .append("line")
+          .attr("fill", function(d) {if (d.direction=="OUT") {return "black";} else {return "black";}})
+          .style("stroke", function(d) {if (d.direction=="OUT") {return "black";} else {return "black";}})
+          .attr("x1", function(d) { return d.source.x; })
+          .attr("y1", function(d) { return d.source.y; })
+          .attr("x2", function(d) { return d.target.x; })
+          .attr("y2", function(d) { return d.target.y; });
+		
+		
+		
+
+      // Create Nodes
+      var node = svgCanvas.selectAll(".node")
+          .data(force.nodes())
+          .enter().append("g")
+          .attr("class", "node");
+	  var currentSource="blank";
+      // Append circles to Nodes
+      node.append("circle")
+          .attr("x", function(d) { return d.x; })
+          .attr("y", function(d) { return d.y; })
+		  .attr("id", function(d) {return d.sourceId;})
+          .attr("r", function(d) { if (d.sourceId==targetDFE) { return centerNodeSize; } else { return nodeSize; } } ) // Node radius
+          .style("fill", function(d, i) { if(d.sourceId==currentSource) {return "red";}
+										  else	{return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}
+										}) // Make the nodes hollow looking
+          .style("stroke-width", 5) // Give the node strokes some thickness
+          .style("stroke", function(d, i) { if(d.sourceId==currentSource) {return "red";}
+										  else	{return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}} ) // Node stroke colors
+		  
+		  .on("click",function(dat,i){
+					var curSource=dat.sourceId;
+					svgCanvasBar.selectAll("rect")
+								.attr("fill", function(d) {if (curSource==d.id) {return "red";} else {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}});
+					svgCanvas.selectAll("circle").style("fill", function(d) {if (d.sourceId==curSource) {return "red"} 
+								                                                         else {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}})
+												 .style("stroke", function(d) {if (d.sourceId==curSource) {return "red"} 
+								                                                         else {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}});
+
+							 
+		  })
+		  .append("svg:title")
+		  .text(function(d) {return "EINPN: " + d.sourceId + "//  Plan Name: " + d.plan_name + "//  Sponsor Name: " + d.sponsor_dfe_name +
+		                            "//  Assets from this DFE = " + formatAsLargeNumber(Math.round(d.prctOwned*d.ASSETS_LESS)) +
+									"//  At a level " + d.level + " of investment";});
+		  
+		  
+	  node.append("text")
+		  .text(function(d) {if (d.sourceId==targetDFE) {return d.sourceId;}})
+		  .attr("x", function(d) { if (d.sourceId==targetDFE) { return 40; } else {return 40;} } )
+		  .attr("y", function(d) { if (d.sourceId==targetDFE) { return 0; } else {return -50;} } )
+		  .attr("font-family", "Arial, Helvetica, sans-serif")
+          .style("font", "normal 12px Arial")
+          .attr("fill", "black");
+		  
+		
+		function tick() {
+        link
+          .attr("x1", function(d) { return d.source.x; })
+          .attr("y1", function(d) { return d.source.y; })
+          .attr("x2", function(d) { return d.target.x; })
+          .attr("y2", function(d) { return d.target.y; });
+      
+        node
+          .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+
+        
+		}
+		
+		var groups=["CASH",
+							"GOVT_SEC",
+							"CORP_DEBT",
+							"STOCK",
+							"REAL_ESTATE",
+							"JOINT_VENTURE",
+							"MUTUAL_FUNDS",
+							"INSURANCE_CO",
+							"OTHER"];
+							
+		
+		var testData=nodeSet.map(function(d) {
+							return groups.map(function(cause) {
+							return {type: cause, y: +d[cause]*d.prctOwned, x: d.index,  
+							        level: d.level, id: d.sourceId, plan_name: d.plan_name,
+									sponsor_dfe_name: d.sponsor_dfe_name,
+									assets: d.prctOwned*d.TOTAL_ASSETS, index: d.index};
+							});
+							});
+		
+		var causes=d3.layout.stack()(testData);
+		
+		
+		var maxBar = d3.max(causes, function(array) {
+							return d3.max(array, function(d) {return d.y+d.y0;});
+							});
+		
+		var barScale = d3.scale.linear().domain([maxBar,0]).range([260,0]);
+		var barScaleReverse = d3.scale.linear().domain([260,0]).range([maxBar,0])
+		var yAxisScale = d3.scale.linear().domain([0,maxBar]).range([260,0]);
+		
+		var yAxis = d3.svg.axis()
+						  .scale(yAxisScale)
+						  .orient("left")
+						  .ticks(10);
+			
+		
+		var cause=svgCanvasBar.selectAll("g.type")
+							  .data(causes)
+							  .enter()
+							  .append("svg:g")
+							  .attr("class", "type");
+		
+		var rect=cause.selectAll("rect")
+					  .data(Object)
+					  .enter().append("rect")
+					  .attr("x", function(d, i) {if(d.type=="CASH") {return 100;}
+					                            if(d.type=="GOVT_SEC") {return 140;}
+												if(d.type=="CORP_DEBT") {return 180;}
+												if(d.type=="STOCK") {return 220;}
+												if(d.type=="REAL_ESTATE") {return 260;}
+												if(d.type=="JOINT_VENTURE") {return 300;}
+												if(d.type=="MUTUAL_FUNDS") {return 340;}
+												if(d.type=="INSURANCE_CO") {return 380;}
+												if(d.type=="OTHER") {return 420;}
+												})
+					  .attr("y", function(d,i) {return 330-barScale(d.y0)-barScale(d.y);})
+					  .attr("width", 20)
+					  .attr("height", function(d) {return barScale(d.y);})
+					  .attr("fill", function(d) {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";})
+					  
+					  .on("click",function(dat,i){
+								var currentSource=dat.id;
+								svgCanvas.selectAll("circle").style("fill", function(d) {if (d.sourceId==currentSource) {return "red"} 
+								                                                         else {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}})
+															 .style("stroke", function(d) {if (d.sourceId==currentSource) {return "red"} 
+								                                                         else {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}});
+								svgCanvasBar.selectAll("rect").attr("fill", function(d) {if (d.id==currentSource) {return "red"}
+								                                                         else {return "rgba(0," + 
+															  Math.round(colorCircleScale(d.level)) +
+															  "," + 
+															  Math.round(colorCircleScale(d.level)) + 
+															  "," + transparencyScale(d.level) + 
+															  ")";}});
+							
+						})
+						.append("svg:title")
+						.text(function(d) {return "EINPN: " + d.id + "//  Plan Name: " + d.plan_name + "//  Sponsor Name: " + d.sponsor_dfe_name +
+		                            "//  " + d.type + " Assets from this DFE = " + formatAsLargeNumber(Math.round(d.y)) +
+									"//  At a level " + d.level + " of investment";});
+					  
+		var barText=svgCanvasBar.selectAll("text")
+								.data(groups)
+								.enter()
+								.append("text")
+								.text(function(d) {return d;})
+								.attr("x", function(d,i) {return 100+40*i;})
+								.attr("y", 350)
+								.attr("font-family", "Arial, Helvetica, sans-serif")
+								.style("font", "bold 12px Arial")
+								.attr("fill", "black")
+								.attr("transform", function(d,i) {return "rotate(90,"+ (105+40*i) + "," + 350 + ")";});
+								
+		svgCanvasBar.append("g")
+					.attr("class", "axis")
+					.attr("transform", "translate(99,70)")
+					.call(yAxis);
+		
+
+		
+		//Add info on focal DFE to upper right corner div			  
+		var einpn = nodeSet[0].sourceId;
+		var plan_name = nodeSet[0].plan_name;
+		var sponsor_dfe_name = nodeSet[0].sponsor_dfe_name;
+		var total_assets = Math.round(nodeSet[0].TOTAL_ASSETS*nodeSet[0].prctOwned);
+		var infoEinpn = infoCanvas.append("text")
+								.text("EINPN: " + einpn)
+								.attr("x", 10)
+								.attr("y", 14)
+								.attr("font-family", "Arial, Helvetica, sans-serif")
+								.style("font", "bold 14px Arial")
+								.attr("fill", "white");
+		var infoPlan_name = infoCanvas.append("text")
+								.text("Plan Name: " + plan_name)
+								.attr("x", 10)
+								.attr("y", 30)
+								.attr("font-family", "Arial, Helvetica, sans-serif")
+								.style("font", "bold 14px Arial")
+								.attr("fill", "white");
+		var infoSponsor_dfe_name = infoCanvas.append("text")
+								.text("Sponsor Name: " + sponsor_dfe_name)
+								.attr("x", 10)
+								.attr("y", 46)
+								.attr("font-family", "Arial, Helvetica, sans-serif")
+								.style("font", "bold 14px Arial")
+								.attr("fill", "white");
+		var infoTotal_assets = infoCanvas.append("text")
+								.text("Total Assets: " + formatAsLargeNumber(total_assets))
+								.attr("x", 10)
+								.attr("y", 62)
+								.attr("font-family", "Arial, Helvetica, sans-serif")
+								.style("font", "bold 14px Arial")
+								.attr("fill", "white");			 
+		
+								 
+		
+		
+		
+		
+			})
+		})
+	})
+	
+	
+		
+		
+	}
+		
+		</script>
+	</body>
+</html>
